@@ -4,7 +4,7 @@ $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 require 'gl-matrix/version'
 
 Gem::Specification.new do |gem|
-  gem.name          = "gl-matrix"
+  gem.name          = "gl-matrix-rails"
   gem.version       = GLMatrix::VERSION
   gem.authors       = ["Colin MacKenzie IV"]
   gem.email         = ["sinisterchipmunk@gmail.com"]
