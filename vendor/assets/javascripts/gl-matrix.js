@@ -2,7 +2,7 @@
  * @fileoverview gl-matrix - High performance matrix and vector operations
  * @author Brandon Jones
  * @author Colin MacKenzie IV
- * @version 2.1.0
+ * @version 2.2.0
  */
 
 /* Copyright (c) 2013, Brandon Jones, Colin MacKenzie IV. All rights reserved.
@@ -28,7 +28,7 @@ ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
 
 
-(function() {
+(function(_global) {
   "use strict";
 
   var shim = {};
@@ -40,8 +40,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
       });
     } else {
       // gl-matrix lives in a browser, define its namespaces in global
-      shim.exports = window;
-    }    
+      shim.exports = typeof(window) !== 'undefined' ? window : _global;
+    }
   }
   else {
     // gl-matrix lives in commonjs, define its namespaces in exports
@@ -1028,9 +1028,9 @@ vec3.transformMat4 = function(out, a, m) {
  */
 vec3.transformMat3 = function(out, a, m) {
     var x = a[0], y = a[1], z = a[2];
-    out[0] = x * m[0] + y * m[3] + z * m[6];
-    out[1] = x * m[1] + y * m[4] + z * m[7];
-    out[2] = x * m[2] + y * m[5] + z * m[8];
+    out[0] = x * m[0] + y * m[1] + z * m[2];
+    out[1] = x * m[3] + y * m[4] + z * m[5];
+    out[2] = x * m[6] + y * m[7] + z * m[8];
     return out;
 };
 
@@ -1043,6 +1043,8 @@ vec3.transformMat3 = function(out, a, m) {
  * @returns {vec3} out
  */
 vec3.transformQuat = function(out, a, q) {
+    // benchmarks: http://jsperf.com/quaternion-transform-vec3-implementations
+
     var x = a[0], y = a[1], z = a[2],
         qx = q[0], qy = q[1], qz = q[2], qw = q[3],
 
@@ -2528,6 +2530,56 @@ mat3.fromQuat = function (out, q) {
 };
 
 /**
+* Calculates a 3x3 normal matrix (transpose inverse) from the 4x4 matrix
+*
+* @param {mat3} out mat3 receiving operation result
+* @param {mat4} a Mat4 to derive the normal matrix from
+*
+* @returns {mat3} out
+*/
+mat3.normalFromMat4 = function (out, a) {
+    var a00 = a[0], a01 = a[1], a02 = a[2], a03 = a[3],
+        a10 = a[4], a11 = a[5], a12 = a[6], a13 = a[7],
+        a20 = a[8], a21 = a[9], a22 = a[10], a23 = a[11],
+        a30 = a[12], a31 = a[13], a32 = a[14], a33 = a[15],
+
+        b00 = a00 * a11 - a01 * a10,
+        b01 = a00 * a12 - a02 * a10,
+        b02 = a00 * a13 - a03 * a10,
+        b03 = a01 * a12 - a02 * a11,
+        b04 = a01 * a13 - a03 * a11,
+        b05 = a02 * a13 - a03 * a12,
+        b06 = a20 * a31 - a21 * a30,
+        b07 = a20 * a32 - a22 * a30,
+        b08 = a20 * a33 - a23 * a30,
+        b09 = a21 * a32 - a22 * a31,
+        b10 = a21 * a33 - a23 * a31,
+        b11 = a22 * a33 - a23 * a32,
+
+        // Calculate the determinant
+        det = b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
+
+    if (!det) { 
+        return null; 
+    }
+    det = 1.0 / det;
+
+    out[0] = (a11 * b11 - a12 * b10 + a13 * b09) * det;
+    out[1] = (a12 * b08 - a10 * b11 - a13 * b07) * det;
+    out[2] = (a10 * b10 - a11 * b08 + a13 * b06) * det;
+
+    out[3] = (a02 * b10 - a01 * b11 - a03 * b09) * det;
+    out[4] = (a00 * b11 - a02 * b08 + a03 * b07) * det;
+    out[5] = (a01 * b08 - a00 * b10 - a03 * b06) * det;
+
+    out[6] = (a31 * b05 - a32 * b04 + a33 * b03) * det;
+    out[7] = (a32 * b02 - a30 * b05 - a33 * b01) * det;
+    out[8] = (a30 * b04 - a31 * b02 + a33 * b00) * det;
+
+    return out;
+};
+
+/**
  * Returns a string representation of a mat3
  *
  * @param {mat3} mat matrix to represent as a string
@@ -3519,11 +3571,13 @@ quat.rotationTo = (function() {
                 vec3.cross(tmpvec3, yUnitVec3, a);
             vec3.normalize(tmpvec3, tmpvec3);
             quat.setAxisAngle(out, tmpvec3, Math.PI);
+            return out;
         } else if (dot > 0.999999) {
             out[0] = 0;
             out[1] = 0;
             out[2] = 0;
             out[3] = 1;
+            return out;
         } else {
             vec3.cross(tmpvec3, a, b);
             out[0] = tmpvec3[0];
@@ -3557,9 +3611,9 @@ quat.setAxes = (function() {
         matr[4] = up[1];
         matr[7] = up[2];
 
-        matr[2] = -view[0];
-        matr[5] = -view[1];
-        matr[8] = -view[2];
+        matr[2] = view[0];
+        matr[5] = view[1];
+        matr[8] = view[2];
 
         return quat.normalize(out, quat.fromMat3(out, matr));
     };
@@ -3949,9 +4003,9 @@ quat.fromMat3 = (function() {
             fRoot = Math.sqrt(fTrace + 1.0);  // 2w
             out[3] = 0.5 * fRoot;
             fRoot = 0.5/fRoot;  // 1/(4w)
-            out[0] = (m[5]-m[7])*fRoot;
-            out[1] = (m[6]-m[2])*fRoot;
-            out[2] = (m[1]-m[3])*fRoot;
+            out[0] = (m[7]-m[5])*fRoot;
+            out[1] = (m[2]-m[6])*fRoot;
+            out[2] = (m[3]-m[1])*fRoot;
         } else {
             // |w| <= 1/2
             var i = 0;
@@ -4002,4 +4056,4 @@ if(typeof(exports) !== 'undefined') {
 
 
   })(shim.exports);
-})();
+})(this);
